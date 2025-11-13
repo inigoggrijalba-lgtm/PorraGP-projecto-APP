@@ -1,0 +1,5 @@
+{
+  "name": "PorraGP",
+  "description": "An application to manage a MotoGP betting pool among friends. Players vote for a rider before each race weekend and earn points based on the rider's performance.",
+  "requestFramePermissions": []
+}
