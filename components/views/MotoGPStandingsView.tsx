@@ -3,7 +3,8 @@ import type { ApiSeason, ApiCategory, ApiStanding } from '../../types';
 import { TrophyIcon } from '../icons/TrophyIcon';
 
 const API_BASE_URL = 'https://api.motogp.pulselive.com/motogp/v1';
-const PROXY_URL = 'https://api.allorigins.win/raw?url=';
+// The proxy is now internal to the application
+const PROXY_URL = '/api/proxy?targetUrl=';
 
 const LoadingSpinner: React.FC = () => (
     <div className="flex justify-center items-center p-4">

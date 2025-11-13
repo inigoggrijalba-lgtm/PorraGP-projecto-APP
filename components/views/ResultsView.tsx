@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import type { Race, Point, ApiSeason, ApiCategory, ApiEvent, ApiSession, ApiClassification, ApiClassificationResponse } from '../../types';
 
 const API_BASE_URL = 'https://api.motogp.pulselive.com/motogp/v1';
-const PROXY_URL = 'https://api.allorigins.win/raw?url=';
+// The proxy is now internal to the application
+const PROXY_URL = '/api/proxy?targetUrl=';
 
 interface ResultsViewProps {
   // Props removed as point awarding is now automatic
