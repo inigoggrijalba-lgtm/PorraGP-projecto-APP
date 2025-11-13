@@ -21,13 +21,13 @@ interface NavBarProps {
 export const NavBar: React.FC<NavBarProps> = ({ activeTab, setActiveTab }) => {
   const navItems = [
     { id: 'home', label: 'Próxima Carrera', icon: <HomeIcon /> },
-    { id: 'calendar', label: 'Calendario', icon: <CalendarIcon /> },
     { id: 'vote', label: 'Votar', icon: <VoteIcon /> },
-    { id: 'standings', label: 'Clasificación', icon: <TrophyIcon /> },
+    { id: 'calendar', label: 'Calendario', icon: <CalendarIcon /> },
+    { id: 'standings', label: 'Clasificación Porra', icon: <TrophyIcon /> },
+    { id: 'stats', label: 'Estadísticas Porra', icon: <StatsIcon /> },
+    { id: 'history', label: 'Historial Votos', icon: <HistoryIcon /> },
+    { id: 'results', label: 'Resultados MotoGP', icon: <FlagIcon /> },
     { id: 'motogpStandings', label: 'Clas. MotoGP', icon: <MotoGPStandingsIcon /> },
-    { id: 'stats', label: 'Estadísticas', icon: <StatsIcon /> },
-    { id: 'history', label: 'Historial', icon: <HistoryIcon /> },
-    { id: 'results', label: 'Resultados', icon: <FlagIcon /> },
     { id: 'livetiming', label: 'Live Timing', icon: <LiveTimingIcon /> },
     { id: 'news', label: 'Noticias', icon: <NewsIcon /> },
   ];

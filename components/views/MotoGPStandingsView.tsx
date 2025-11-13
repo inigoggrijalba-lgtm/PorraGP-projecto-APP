@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import type { ApiSeason, ApiCategory, ApiStanding } from '../../types';
 import { TrophyIcon } from '../icons/TrophyIcon';
 
-const API_BASE_URL = 'https://api.motogp.pulselive.com/motogp/v1/results';
-const PROXY_URL = 'https://api.allorigins.win/raw?url=';
+const API_BASE_URL = 'https://api.motogp.pulselive.com/motogp/v1';
+const PROXY_URL = '/api/proxy?targetUrl=';
 
 const LoadingSpinner: React.FC = () => (
     <div className="flex justify-center items-center p-4">
@@ -87,14 +87,14 @@ export const MotoGPStandingsView: React.FC = () => {
             setLoading(prev => ({ ...prev, standings: true }));
             setStandings([]); // Reset standings before fetching
             
-            const data = await fetchData<{ classification: ApiStanding[] }>(`standings/worldstanding?seasonUuid=${currentSeason.id}&categoryUuid=${selectedCategoryId}`);
+            // The `standings` endpoint returns an object with a 'classification' property containing the standings.
+            const data = await fetchData<{ classification: ApiStanding[] }>(`results/standings?seasonUuid=${currentSeason.id}&categoryUuid=${selectedCategoryId}`);
             
-            // FIX: The API returns the array under the "classification" key for this endpoint.
-            if (data && Array.isArray(data.classification)) {
+            if (data && data.classification && Array.isArray(data.classification)) {
                 setStandings(data.classification);
             } else {
                 setStandings([]); // Fallback to empty array on unexpected response
-                console.warn("Standings data was not in the expected format (expected 'classification' property):", data);
+                console.warn("Standings data was not in the expected format (expected object with a 'classification' array):", data);
             }
             setLoading(prev => ({ ...prev, standings: false }));
         };

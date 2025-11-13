@@ -1,17 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { Race, Point, ApiSeason, ApiCategory, ApiEvent, ApiSession, ApiClassification, ApiClassificationResponse } from '../../types';
 
-const API_BASE_URL = 'https://api.motogp.pulselive.com/motogp/v1/results';
-const PROXY_URL = 'https://api.allorigins.win/raw?url=';
+const API_BASE_URL = 'https://api.motogp.pulselive.com/motogp/v1';
+const PROXY_URL = '/api/proxy?targetUrl=';
 
 interface ResultsViewProps {
-  races: Race[];
-  points: Point[];
-  handleAwardPoints: (
-    apiEventId: string,
-    session: ApiSession,
-    classification: ApiClassification[]
-  ) => Promise<{ success: boolean; message: string }>;
+  // Props removed as point awarding is now automatic
 }
 
 const LoadingSpinner: React.FC = () => (
@@ -20,8 +14,7 @@ const LoadingSpinner: React.FC = () => (
     </div>
 );
 
-// FIX: Add 'export' to make the component available for import in other modules.
-export const ResultsView: React.FC<ResultsViewProps> = ({ races, points, handleAwardPoints }) => {
+export const ResultsView: React.FC<ResultsViewProps> = () => {
     const [seasons, setSeasons] = useState<ApiSeason[]>([]);
     const [categories, setCategories] = useState<ApiCategory[]>([]);
     const [events, setEvents] = useState<ApiEvent[]>([]);
@@ -41,12 +34,6 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ races, points, handleA
         classification: false,
     });
     const [error, setError] = useState<string | null>(null);
-    
-    const [awardPointsState, setAwardPointsState] = useState({
-        loading: false,
-        message: '',
-        isError: false,
-    });
 
     const fetchData = useCallback(async <T,>(endpoint: string, loaderKey: keyof typeof loading): Promise<T | null> => {
         setLoading(prev => ({ ...prev, [loaderKey]: true }));
@@ -112,7 +99,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ races, points, handleA
             setSelectedSession(null);
             return;
         }
-        fetchData<ApiSession[]>(`sessions?eventUuid=${selectedEventId}&categoryUuid=${selectedCategoryId}`, 'sessions').then(data => {
+        fetchData<ApiSession[]>(`results/sessions?eventUuid=${selectedEventId}&categoryUuid=${selectedCategoryId}`, 'sessions').then(data => {
             if (data) setSessions(data);
         });
     }, [selectedEventId, selectedCategoryId, fetchData]);
@@ -122,7 +109,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ races, points, handleA
             setClassification([]);
             return;
         };
-        fetchData<ApiClassificationResponse>(`session/${selectedSession.id}/classification?test=false`, 'classification').then(data => {
+        fetchData<ApiClassificationResponse>(`results/session/${selectedSession.id}/classification?test=false`, 'classification').then(data => {
             if (data) setClassification(data.classification);
         });
     }, [selectedSession, fetchData]);
@@ -136,46 +123,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ races, points, handleA
         } else if (setter === setSelectedCategoryId || setter === setSelectedEventId) {
             setSelectedSession(null);
         }
-        setAwardPointsState({ loading: false, message: '', isError: false });
     };
-
-    const handleAwardPointsClick = async () => {
-        if (!selectedEventId || !selectedSession || classification.length === 0) return;
-
-        setAwardPointsState({ loading: true, message: '', isError: false });
-        const result = await handleAwardPoints(selectedEventId, selectedSession, classification);
-        setAwardPointsState({
-            loading: false,
-            message: result.message,
-            isError: !result.success
-        });
-    };
-
-    const renderAwardPointsButton = () => {
-        if (!selectedEventId || !selectedSession || classification.length === 0 || classification[0]?.points === undefined) {
-            return null;
-        }
-
-        const currentRace = races.find(r => r.api_event_id === selectedEventId);
-        const isScored = points.some(p => p.race_id === currentRace?.id && p.session_id === selectedSession?.id);
-
-        return (
-            <div className="mt-6 text-center">
-                <button
-                    onClick={handleAwardPointsClick}
-                    disabled={isScored || awardPointsState.loading}
-                    className="bg-red-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-red-700 transition-colors duration-300 shadow-lg focus:outline-none focus:ring-4 focus:ring-red-500/50 disabled:bg-gray-500 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                    {awardPointsState.loading ? 'Calculando...' : (isScored ? 'Puntos ya Otorgados' : 'Calcular y Otorgar Puntos de esta Sesión')}
-                </button>
-                {awardPointsState.message && (
-                    <p className={`mt-4 text-sm ${awardPointsState.isError ? 'text-red-400' : 'text-green-400'}`}>
-                        {awardPointsState.message}
-                    </p>
-                )}
-            </div>
-        );
-    }
 
     const renderTable = () => {
         if (loading.classification) return <LoadingSpinner />;
@@ -231,7 +179,6 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ races, points, handleA
                         ))}
                     </tbody>
                 </table>
-                {renderAwardPointsButton()}
             </div>
         );
     }
@@ -253,7 +200,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ races, points, handleA
         <div className="animate-fade-in space-y-6">
             <div className="text-center">
                 <h2 className="text-2xl md:text-3xl font-bold text-white">Resultados Históricos MotoGP</h2>
-                <p className="text-gray-400 mt-1">Explora los resultados y otorga puntos a los jugadores.</p>
+                <p className="text-gray-400 mt-1">Explora los resultados de carreras pasadas.</p>
             </div>
             {error && <div className="bg-red-900/50 text-red-300 p-4 rounded-lg text-center">{error}</div>}
             <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 space-y-6">
@@ -270,7 +217,6 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ races, points, handleA
                             {sessions.map(session => (
                                 <button key={session.id} onClick={() => {
                                     setSelectedSession(session);
-                                    setAwardPointsState({ loading: false, message: '', isError: false });
                                 }}
                                     className={`px-3 py-2 rounded-md text-xs font-semibold transition-colors ${selectedSession?.id === session.id ? 'bg-red-600 text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}>
                                     {session.type} {session.number}

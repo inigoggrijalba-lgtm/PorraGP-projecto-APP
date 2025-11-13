@@ -1,8 +1,8 @@
 import type { Race, ApiSeason, ApiEvent } from '../types';
 
-const API_BASE_URL = 'https://api.motogp.pulselive.com/motogp/v1/results';
-// Use the allorigins proxy to bypass CORS issues.
-const PROXY_URL = 'https://api.allorigins.win/raw?url=';
+const API_BASE_URL = 'https://api.motogp.pulselive.com/motogp/v1';
+// Use the internal app proxy to bypass CORS issues.
+const PROXY_URL = '/api/proxy?targetUrl=';
 
 /**
  * Converts an ISO 3166-1 alpha-2 country code to a flag emoji.
@@ -17,16 +17,16 @@ function isoToFlag(iso: string): string {
 }
 
 /**
- * Fetches data from the MotoGP API via the allorigins proxy, with retries.
+ * Fetches data from the MotoGP API via the internal proxy, with retries.
  * @param endpoint The API endpoint to fetch.
  * @returns The JSON response data.
  */
-async function fetchApiData<T>(endpoint: string): Promise<T> {
+export async function fetchMotogpApiData<T>(endpoint: string): Promise<T> {
   const retries = 3;
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const targetUrl = `${API_BASE_URL}/${endpoint}`;
-      // Use the allorigins proxy by passing the target URL as a query parameter.
+      // Use the internal proxy by passing the target URL as a query parameter.
       const response = await fetch(`${PROXY_URL}${encodeURIComponent(targetUrl)}`);
       if (!response.ok) throw new Error(`Network response was not ok. Status: ${response.status}`);
       return await response.json();
@@ -51,7 +51,7 @@ async function fetchApiData<T>(endpoint: string): Promise<T> {
  */
 export async function fetchMotogpCalendar(): Promise<{ races: Race[], year: number }> {
   // 1. Fetch all seasons to find the current one
-  const seasons = await fetchApiData<ApiSeason[]>('seasons');
+  const seasons = await fetchMotogpApiData<ApiSeason[]>('seasons');
   
   // 2. Find the season object where "current" is true
   const currentSeason = seasons.find(season => season.current === true);
@@ -60,7 +60,7 @@ export async function fetchMotogpCalendar(): Promise<{ races: Race[], year: numb
   }
 
   // 3. Fetch all events for the current season using its ID
-  const events = await fetchApiData<ApiEvent[]>(`events?seasonUuid=${currentSeason.id}`);
+  const events = await fetchMotogpApiData<ApiEvent[]>(`events?seasonUuid=${currentSeason.id}`);
   
   // 4. Filter out events that are tests
   const raceEvents = events.filter(event => event.test === false);

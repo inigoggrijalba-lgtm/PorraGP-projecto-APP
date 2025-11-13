@@ -16,6 +16,7 @@ export interface Rider {
 export interface PlayerStats {
   playerId: number;
   points: number;
+  lastRacePoints: number;
   voteHistory: Map<number, number>; // Map<riderId, count>
 }
 
@@ -28,6 +29,7 @@ export interface Vote {
   player_id: number;
   race_id: number;
   rider_id: number;
+  is_locked: boolean;
 }
 
 export interface Point {

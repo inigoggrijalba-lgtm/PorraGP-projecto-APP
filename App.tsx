@@ -17,7 +17,7 @@ import { MotoGPStandingsView } from './components/views/MotoGPStandingsView';
 import { SeedData } from './components/SeedData';
 import { initializeSupabaseClient } from './utils/supabase';
 import { fetchMotogpCalendar } from './utils/api';
-import type { Tab, PlayerStats, Race, Player, Rider, Vote, Point, ApiSession, ApiClassification } from './types';
+import type { Tab, PlayerStats, Race, Player, Rider, Vote, Point } from './types';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('home');
@@ -40,6 +40,8 @@ const App: React.FC = () => {
 
   const [historySelectedPlayerId, setHistorySelectedPlayerId] = useState<number>(0);
   const [nextRace, setNextRace] = useState<Race | undefined>();
+
+  const [isVotingOpen, setIsVotingOpen] = useState(true);
   
   const loadData = useCallback(async () => {
     if (!supabaseClient) return;
@@ -130,31 +132,55 @@ const App: React.FC = () => {
       const upcomingRace = races.find(race => {
         return new Date(race.race_date) >= today;
       });
-      setNextRace(upcomingRace || races[races.length - 1]);
+      const currentNextRace = upcomingRace || races[races.length - 1];
+      setNextRace(currentNextRace);
+
+      if (currentNextRace) {
+        const raceDate = new Date(currentNextRace.race_date);
+        const votingDeadline = new Date(raceDate);
+        // Find the Saturday of the race week
+        const dayOfWeek = raceDate.getUTCDay(); // Sunday = 0, Saturday = 6
+        const daysUntilSaturday = (6 - dayOfWeek + 7) % 7;
+        votingDeadline.setUTCDate(raceDate.getUTCDate() + daysUntilSaturday - 1); // Go to Saturday of the GP
+        votingDeadline.setUTCHours(14, 0, 0, 0); // 14:00 UTC on Saturday
+
+        setIsVotingOpen(new Date() < votingDeadline);
+      } else {
+        setIsVotingOpen(false);
+      }
+
     } else {
       setNextRace(undefined);
+      setIsVotingOpen(false);
     }
   }, [races]);
 
-  const { playerStats, bets } = useMemo(() => {
+  const { playerStats, bets, lockedVotes } = useMemo(() => {
     const stats: PlayerStats[] = players.map(player => ({
         playerId: player.id,
         points: 0,
+        lastRacePoints: 0,
         voteHistory: new Map<number, number>(),
     }));
 
     const statsById = new Map<number, PlayerStats>(stats.map(s => [s.playerId, s]));
+    
+    const lastScoredRaceId = points.length > 0
+        ? Math.max(...points.map(p => p.race_id))
+        : null;
 
-    // 1. Sum up all points from the `points` state
     for (const point of points) {
         const playerStat = statsById.get(point.player_id);
         if (playerStat) {
             playerStat.points += point.points;
+            if (lastScoredRaceId && point.race_id === lastScoredRaceId) {
+                playerStat.lastRacePoints += point.points;
+            }
         }
     }
 
-    // 2. Calculate vote history and current bets from the `votes` state
     const currentBets = new Map<number, number>();
+    const currentLockedVotes = new Map<number, boolean>();
     for (const vote of votes) {
         const playerStat = statsById.get(vote.player_id);
         if(playerStat) {
@@ -164,10 +190,11 @@ const App: React.FC = () => {
 
         if(nextRace && vote.race_id === nextRace.id) {
             currentBets.set(vote.player_id, vote.rider_id);
+            currentLockedVotes.set(vote.player_id, vote.is_locked);
         }
     }
     
-    return { playerStats: stats, bets: currentBets };
+    return { playerStats: stats, bets: currentBets, lockedVotes: currentLockedVotes };
   }, [players, votes, points, nextRace]);
   
   const playerStatsById = useMemo(() => new Map<number, PlayerStats>(playerStats.map(ps => [ps.playerId, ps])), [playerStats]);
@@ -175,26 +202,57 @@ const App: React.FC = () => {
   const handleVote = async (playerId: number, riderId: number): Promise<{ success: boolean; message: string }> => {
     if (!supabaseClient) return { success: false, message: "El cliente de Supabase no está disponible." };
     if (!nextRace) return { success: false, message: "No se ha podido determinar la próxima carrera." };
-  
+    if (!isVotingOpen) return { success: false, message: "El plazo para votar ha finalizado." };
+
     const stats = playerStatsById.get(playerId);
     if (!stats) return { success: false, message: "Jugador no encontrado." };
-  
+
     const voteHistoryCount = stats.voteHistory.get(riderId) || 0;
-    if (voteHistoryCount >= 3) {
+    const isCurrentVoteForThisRider = bets.get(playerId) === riderId;
+
+    if (voteHistoryCount >= 3 && !isCurrentVoteForThisRider) {
       return { success: false, message: `Ya has votado por ${ridersById.get(riderId)?.name} 3 veces.` };
     }
-  
+
     try {
-      const { error } = await supabaseClient.from('Votes').upsert(
-        { player_id: playerId, race_id: nextRace.id, rider_id: riderId },
-        { onConflict: 'player_id, race_id' }
-      );
-  
-      if (error) throw error;
+      const { data: existingVoteData, error: selectError } = await supabaseClient
+        .from('Votes')
+        .select('*')
+        .eq('player_id', playerId)
+        .eq('race_id', nextRace.id)
+        .single();
+
+      if (selectError && selectError.code !== 'PGRST116') {
+        throw selectError;
+      }
+
+      if (existingVoteData) {
+        if (existingVoteData.is_locked) {
+          return { success: false, message: "Ya has cambiado tu voto para esta carrera. No se permiten más cambios." };
+        }
+        
+        if (existingVoteData.rider_id === riderId) {
+            return { success: true, message: "Has reconfirmado tu voto." };
+        }
+
+        const { error: updateError } = await supabaseClient
+          .from('Votes')
+          .update({ rider_id: riderId, is_locked: true })
+          .eq('player_id', playerId)
+          .eq('race_id', nextRace.id);
+
+        if (updateError) throw updateError;
+      } else {
+        const { error: insertError } = await supabaseClient
+          .from('Votes')
+          .insert({ player_id: playerId, race_id: nextRace.id, rider_id: riderId, is_locked: false });
+        
+        if (insertError) throw insertError;
+      }
       
       const { data: votesData, error: votesError } = await supabaseClient.from('Votes').select('*');
       if (votesError) throw votesError;
-      setVotes(votesData);
+      setVotes(votesData || []);
 
       return { success: true, message: "¡Voto registrado con éxito!" };
     } catch (e: any) {
@@ -240,79 +298,9 @@ const App: React.FC = () => {
     }
   }, [supabaseClient, loadData]);
 
-  const handleAwardPoints = useCallback(async (
-    apiEventId: string,
-    session: ApiSession,
-    classification: ApiClassification[]
-  ): Promise<{ success: boolean; message: string }> => {
-      if (!supabaseClient) return { success: false, message: "Supabase no conectado." };
-
-      const race = races.find(r => r.api_event_id === apiEventId);
-      if (!race) return { success: false, message: `No se encontró la carrera en la base de datos (ID de evento: ${apiEventId}). Asegúrate de que el calendario está poblado y actualizado.` };
-      
-      const raceId = race.id;
-      const sessionId = session.id;
-
-      // 1. Check if points for this session are already awarded
-      const isAlreadyScored = points.some(p => p.race_id === raceId && p.session_id === sessionId);
-      if (isAlreadyScored) return { success: false, message: "Los puntos para esta sesión ya han sido otorgados." };
-
-      // 2. Get all votes for this specific race
-      const raceVotes = votes.filter(v => v.race_id === raceId);
-      if (raceVotes.length === 0) return { success: true, message: "No hay votos para esta carrera. No se otorgaron puntos." };
-
-      // 3. Create a map of rider number to our internal rider ID
-      const ridersByNumber = new Map<number, Rider>(riders.map(r => [r.number, r]));
-
-      // 4. Create a map of our internal rider ID to points scored in this session
-      const pointsByRiderId = new Map<number, number>();
-      for (const result of classification) {
-          if (result.points && result.points > 0) {
-              const rider = ridersByNumber.get(result.rider.number);
-              if (rider) {
-                  pointsByRiderId.set(rider.id, result.points);
-              }
-          }
-      }
-
-      // 5. Prepare the new point records
-      const newPoints: Omit<Point, 'id' | 'created_at'>[] = [];
-      for (const vote of raceVotes) {
-          const scoredPoints = pointsByRiderId.get(vote.rider_id);
-          if (scoredPoints && scoredPoints > 0) {
-              newPoints.push({
-                  player_id: vote.player_id,
-                  race_id: raceId,
-                  rider_id: vote.rider_id,
-                  session_id: sessionId,
-                  session_name: `${session.type} ${session.number ?? ''}`.trim(),
-                  points: scoredPoints,
-              });
-          }
-      }
-
-      if (newPoints.length === 0) {
-          return { success: true, message: "Ninguno de los pilotos votados ha puntuado en esta sesión." };
-      }
-      
-      // 6. Insert new points into the database
-      try {
-          const { error } = await supabaseClient.from('Points').insert(newPoints);
-          if (error) throw error;
-          
-          await loadData(); // Reload all data to reflect new scores
-          return { success: true, message: `¡Se han otorgado ${newPoints.length} puntuaciones con éxito!` };
-      } catch (e: any) {
-          console.error("Error awarding points:", e);
-          return { success: false, message: `Error al guardar los puntos: ${e.message}` };
-      }
-
-  }, [supabaseClient, races, votes, points, riders, loadData]);
-
-
   const renderContent = () => {
     switch (activeTab) {
-      case 'results': return <ResultsView races={races} points={points} handleAwardPoints={handleAwardPoints} />;
+      case 'results': return <ResultsView />;
       case 'livetiming': return <LiveTimingView />;
       case 'news': return <NewsView />;
       case 'motogpStandings': return <MotoGPStandingsView />;
@@ -332,7 +320,7 @@ const App: React.FC = () => {
           populateError={populateError}
         />
       );
-      case 'vote': return <VoteView players={players} riders={riders} playerStatsById={playerStatsById} handleVote={handleVote} currentBets={bets} />;
+      case 'vote': return <VoteView players={players} riders={riders} playerStatsById={playerStatsById} handleVote={handleVote} currentBets={bets} lockedVotes={lockedVotes} isVotingOpen={isVotingOpen} nextRace={nextRace} />;
       case 'standings': return <StandingsView playerStats={playerStats} playersById={playersById} onPlayerClick={handleSelectPlayerHistory} />;
       case 'stats': return <StatsView playersById={playersById} ridersById={ridersById} votes={votes} points={points} playerStats={playerStats} />;
       case 'history': return <HistoryView playerStats={playerStats} playersById={playersById} ridersById={ridersById} selectedPlayerId={historySelectedPlayerId} setSelectedPlayerId={setHistorySelectedPlayerId} />;

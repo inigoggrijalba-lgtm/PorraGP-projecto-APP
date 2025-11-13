@@ -14,6 +14,8 @@ export const StandingsView: React.FC<StandingsViewProps> = ({ playerStats, playe
     return [...playerStats].sort((a, b) => b.points - a.points);
   }, [playerStats]);
 
+  const leaderPoints = sortedStandings.length > 0 ? sortedStandings[0].points : 0;
+
   const getRankColor = (rank: number) => {
     switch(rank) {
       case 0: return 'text-yellow-400';
@@ -24,7 +26,7 @@ export const StandingsView: React.FC<StandingsViewProps> = ({ playerStats, playe
   };
 
   return (
-    <div className="animate-fade-in max-w-2xl mx-auto">
+    <div className="animate-fade-in max-w-4xl mx-auto">
       <div className="text-center mb-6">
         <h2 className="text-2xl md:text-3xl font-bold text-white">Clasificación General</h2>
         <p className="text-gray-400 mt-1">Puntos acumulados durante la temporada.</p>
@@ -37,11 +39,14 @@ export const StandingsView: React.FC<StandingsViewProps> = ({ playerStats, playe
               <th scope="col" className="px-4 py-3 text-center">#</th>
               <th scope="col" className="px-6 py-3">Jugador</th>
               <th scope="col" className="px-6 py-3 text-right">Puntos</th>
+              <th scope="col" className="px-6 py-3 text-right">Gap</th>
+              <th scope="col" className="px-6 py-3 text-right">Ult. Carrera</th>
             </tr>
           </thead>
           <tbody>
             {sortedStandings.map((stats, index) => {
               const player = playersById.get(stats.playerId);
+              const gap = leaderPoints - stats.points;
               return (
                 <tr 
                   key={stats.playerId} 
@@ -55,6 +60,10 @@ export const StandingsView: React.FC<StandingsViewProps> = ({ playerStats, playe
                     {player?.name || 'Unknown'}
                   </th>
                   <td className="px-6 py-4 text-right font-mono text-lg">{stats.points}</td>
+                  <td className="px-6 py-4 text-right font-mono text-base">{index === 0 ? '-' : `-${gap}`}</td>
+                  <td className="px-6 py-4 text-right font-mono text-base text-gray-400">
+                    {stats.lastRacePoints > 0 ? `+${stats.lastRacePoints}` : stats.lastRacePoints}
+                  </td>
                 </tr>
               );
             })}

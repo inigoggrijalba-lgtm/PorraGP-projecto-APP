@@ -44,6 +44,7 @@ export const RIDERS: Rider[] = [
 export const INITIAL_PLAYER_STATS: PlayerStats[] = PLAYERS.map(player => ({
   playerId: player.id,
   points: 0,
+  lastRacePoints: 0,
   voteHistory: new Map<number, number>(),
 }));
 
