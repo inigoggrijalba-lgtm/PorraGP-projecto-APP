@@ -1,8 +1,8 @@
 import type { Race, ApiSeason, ApiEvent } from '../types';
 
 const API_BASE_URL = 'https://api.motogp.pulselive.com/motogp/v1';
-// Use the internal app proxy to bypass CORS issues.
-const PROXY_URL = '/api/proxy?targetUrl=';
+// Use an external proxy to bypass CORS issues.
+const PROXY_URL = 'https://api.allorigins.win/raw?url=';
 
 /**
  * Converts an ISO 3166-1 alpha-2 country code to a flag emoji.
@@ -17,7 +17,7 @@ function isoToFlag(iso: string): string {
 }
 
 /**
- * Fetches data from the MotoGP API via the internal proxy, with retries.
+ * Fetches data from the MotoGP API via the external proxy, with retries.
  * @param endpoint The API endpoint to fetch.
  * @returns The JSON response data.
  */
@@ -26,7 +26,7 @@ export async function fetchMotogpApiData<T>(endpoint: string): Promise<T> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const targetUrl = `${API_BASE_URL}/${endpoint}`;
-      // Use the internal proxy by passing the target URL as a query parameter.
+      // Use the external proxy by passing the target URL as a query parameter.
       const response = await fetch(`${PROXY_URL}${encodeURIComponent(targetUrl)}`);
       if (!response.ok) throw new Error(`Network response was not ok. Status: ${response.status}`);
       return await response.json();
