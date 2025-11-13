@@ -2,8 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import type { LiveTimingResponse, LiveTimingRider } from '../../types';
 
 const API_URL = 'https://api.motogp.pulselive.com/motogp/v1/timing-gateway/livetiming-lite';
-// The proxy is now internal to the application
-const PROXY_URL = '/api/proxy?targetUrl=';
+const PROXY_URL = 'https://api.allorigins.win/raw?url=';
 
 const LoadingSpinner: React.FC = () => (
     <div className="flex justify-center items-center p-8">

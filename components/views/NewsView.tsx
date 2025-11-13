@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { NewsItem } from '../../types';
 
 const RSS_FEED_URL = 'https://es.motorsport.com/rss/motogp/news/';
-// The proxy is now internal to the application
-const PROXY_URL = '/api/proxy?targetUrl=';
+const PROXY_URL = 'https://api.allorigins.win/raw?url=';
 
 const LoadingSpinner: React.FC = () => (
     <div className="flex justify-center items-center p-8">

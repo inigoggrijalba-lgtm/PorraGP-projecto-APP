@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { Race, Point, ApiSeason, ApiCategory, ApiEvent, ApiSession, ApiClassification, ApiClassificationResponse } from '../../types';
 
-const API_BASE_URL = 'https://api.motogp.pulselive.com/motogp/v1';
-// The proxy is now internal to the application
-const PROXY_URL = '/api/proxy?targetUrl=';
+const API_BASE_URL = 'https://api.motogp.pulselive.com/motogp/v1/results';
+const PROXY_URL = 'https://api.allorigins.win/raw?url=';
 
 interface ResultsViewProps {
   // Props removed as point awarding is now automatic
@@ -100,7 +99,7 @@ export const ResultsView: React.FC<ResultsViewProps> = () => {
             setSelectedSession(null);
             return;
         }
-        fetchData<ApiSession[]>(`results/sessions?eventUuid=${selectedEventId}&categoryUuid=${selectedCategoryId}`, 'sessions').then(data => {
+        fetchData<ApiSession[]>(`sessions?eventUuid=${selectedEventId}&categoryUuid=${selectedCategoryId}`, 'sessions').then(data => {
             if (data) setSessions(data);
         });
     }, [selectedEventId, selectedCategoryId, fetchData]);
@@ -110,7 +109,7 @@ export const ResultsView: React.FC<ResultsViewProps> = () => {
             setClassification([]);
             return;
         };
-        fetchData<ApiClassificationResponse>(`results/session/${selectedSession.id}/classification?test=false`, 'classification').then(data => {
+        fetchData<ApiClassificationResponse>(`session/${selectedSession.id}/classification?test=false`, 'classification').then(data => {
             if (data) setClassification(data.classification);
         });
     }, [selectedSession, fetchData]);
